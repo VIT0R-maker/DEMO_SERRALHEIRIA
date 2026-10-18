@@ -1,0 +1,405 @@
+.contact-section {
+  background: var(--ink);
+  color: var(--paper);
+  padding-block: clamp(52px, 6vw, 82px);
+}
+
+.contact-layout {
+  display: grid;
+  grid-template-columns: 1fr 1.06fr;
+  align-items: center;
+  gap: clamp(32px, 4vw, 68px);
+}
+
+.contact-intro,
+.quote-form,
+.quote-field {
+  min-width: 0;
+}
+
+.contact-intro .eyebrow {
+  color: var(--copper-light);
+}
+
+.contact-intro .section-title {
+  margin-block: 16px 18px;
+  font-size: clamp(2.25rem, 3.7vw, 3.4rem);
+  line-height: 1.12;
+  max-width: 13em;
+}
+
+.contact-dot {
+  color: var(--copper-light);
+}
+
+.contact-description {
+  color: #d8d9d2;
+  font-size: clamp(1rem, 1.5vw, 1.18rem);
+  line-height: 1.65;
+  max-width: 33em;
+}
+
+.contact-prompts {
+  display: grid;
+  gap: 22px;
+  margin: 30px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.contact-prompts li {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  font-size: clamp(.95rem, 1.35vw, 1.1rem);
+  line-height: 1.45;
+  font-weight: 500;
+}
+
+.contact-prompts svg {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  color: var(--copper-light);
+}
+
+.quote-form {
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid #e2e0d9;
+  border-radius: 9px;
+  padding: clamp(23px, 2.4vw, 36px);
+  box-shadow: 0 12px 32px #00000012;
+}
+
+.quote-form h3 {
+  font-size: clamp(1.5rem, 2.2vw, 2rem);
+  line-height: 1.2;
+  letter-spacing: -.045em;
+  margin: 0 0 23px;
+  scroll-margin-top: 130px;
+}
+
+.quote-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 19px 16px;
+}
+
+.quote-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.quote-field-wide {
+  grid-column: 1 / -1;
+}
+
+.quote-field label {
+  font-size: .86rem;
+  line-height: 1.45;
+  font-weight: 600;
+}
+
+.required-marker {
+  color: var(--copper);
+  font-size: .8em;
+}
+
+.field-optional {
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 400;
+}
+
+.quote-field input,
+.quote-field select,
+.quote-field textarea {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid #858b80;
+  border-radius: 5px;
+  background: #ffffff4d;
+  color: var(--ink);
+  padding: 11px 13px;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.4;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.quote-field input,
+.quote-field select {
+  min-height: 46px;
+}
+
+.quote-field textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.quote-field input::placeholder,
+.quote-field textarea::placeholder {
+  color: var(--muted);
+  opacity: 1;
+  font-size: .84rem;
+}
+
+.quote-select-wrap {
+  position: relative;
+}
+
+.quote-select-wrap select {
+  appearance: none;
+  padding-right: 35px;
+  cursor: pointer;
+  font-size: .9rem;
+}
+
+.quote-select-wrap select:invalid {
+  color: var(--muted);
+}
+
+.quote-select-wrap svg {
+  width: 22px;
+  height: 22px;
+  position: absolute;
+  right: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--muted);
+}
+
+.quote-field input:focus-visible,
+.quote-field select:focus-visible,
+.quote-field textarea:focus-visible,
+.quote-preview-message:focus-visible {
+  outline: 2px solid var(--copper);
+  outline-offset: 2px;
+  border-color: var(--copper);
+  box-shadow: 0 0 0 4px #ad43260c;
+}
+
+.quote-field [aria-invalid='true'] {
+  border-color: #a32d20;
+}
+
+.field-error {
+  margin: 0;
+  color: #a32d20;
+  font-size: .8rem;
+  line-height: 1.4;
+}
+
+.quote-submit {
+  width: 100%;
+  min-height: 51px;
+  margin-top: 20px;
+  gap: 11px;
+  font-size: 1rem;
+}
+
+.quote-submit svg {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+}
+
+.quote-note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: .74rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.quote-handoff {
+  margin: 14px 0 0;
+  font-size: .85rem;
+  line-height: 1.5;
+}
+
+.quote-dialog {
+  color: var(--ink);
+  background: var(--paper);
+  width: min(580px, calc(100% - 32px));
+  max-height: calc(100dvh - 40px);
+  margin: auto;
+  padding: clamp(22px, 4vw, 36px);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 30px 100px #0005;
+  overflow-y: auto;
+}
+
+.quote-dialog::backdrop {
+  background: #101814b8;
+  backdrop-filter: blur(4px);
+}
+
+.quote-dialog-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.quote-dialog-heading .eyebrow {
+  margin: 0;
+  color: var(--copper);
+  font-size: .75rem;
+}
+
+.quote-dialog-close {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.quote-dialog-close svg {
+  width: 23px;
+  height: 23px;
+}
+
+.quote-dialog h2 {
+  margin: 0 0 14px;
+  font-size: clamp(1.6rem, 4vw, 2.1rem);
+  line-height: 1.15;
+  letter-spacing: -.04em;
+}
+
+#preview-description {
+  margin: 0 0 24px;
+  color: var(--muted);
+  font-size: .93rem;
+  line-height: 1.6;
+}
+
+.preview-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: .85rem;
+  font-weight: 600;
+}
+
+.quote-preview-message {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-height: 175px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  resize: vertical;
+  background: #fff9;
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.quote-copy {
+  margin-top: 20px;
+  width: 100%;
+  min-height: 48px;
+  gap: 10px;
+}
+
+.quote-copy svg {
+  width: 21px;
+  height: 21px;
+}
+
+.quote-copy-status {
+  margin: 12px 0 0;
+  min-height: 2.8em;
+  color: var(--muted);
+  font-size: .8rem;
+  line-height: 1.5;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .quote-dialog-close:hover {
+    border-color: var(--copper);
+    color: var(--copper);
+  }
+}
+
+@media (max-width: 960px) {
+  .contact-layout {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
+
+  .contact-intro .section-title {
+    max-width: 17em;
+  }
+
+  .contact-description {
+    max-width: 38em;
+  }
+
+  .contact-prompts {
+    gap: 17px;
+  }
+
+  .contact-prompts svg {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+  }
+}
+
+@media (max-width: 540px) {
+  .quote-fields {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .quote-form {
+    padding: 24px 19px;
+  }
+
+  .quote-select-wrap select {
+    font-size: 1rem;
+  }
+
+  .contact-prompts li {
+    gap: 16px;
+  }
+
+  .quote-submit {
+    padding-inline: 10px;
+    font-size: .88rem;
+  }
+
+  .quote-submit svg {
+    flex-basis: 24px;
+    width: 24px;
+    height: 24px;
+  }
+
+  .field-optional {
+    display: inline-block;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quote-field input,
+  .quote-field select,
+  .quote-field textarea {
+    transition: none;
+  }
+}

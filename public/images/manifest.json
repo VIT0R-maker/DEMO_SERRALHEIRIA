@@ -1,0 +1,119 @@
+{
+  "note": "Photographs extracted from the supplied mockups. Baked-in captions are excluded. Gallery crops are panoramic because the original caption strips hide the bottom of each photograph. No upscaling.",
+  "images": [
+    {
+      "file": "hero-gate.webp",
+      "width": 780,
+      "height": 750,
+      "bytes": 123604,
+      "source": "1.png",
+      "crop": [
+        474,
+        206,
+        1254,
+        956
+      ],
+      "small": {
+        "file": "hero-gate-480.webp",
+        "width": 480,
+        "height": 462,
+        "bytes": 50078
+      }
+    },
+    {
+      "file": "workshop.webp",
+      "width": 752,
+      "height": 356,
+      "bytes": 50012,
+      "source": "2.png",
+      "crop": [
+        82,
+        658,
+        834,
+        1014
+      ],
+      "small": {
+        "file": "workshop-480.webp",
+        "width": 480,
+        "height": 227,
+        "bytes": 25522
+      }
+    },
+    {
+      "file": "project-gate.webp",
+      "width": 669,
+      "height": 186,
+      "bytes": 34958,
+      "source": "3.png",
+      "crop": [
+        63,
+        249,
+        732,
+        435
+      ],
+      "small": {
+        "file": "project-gate-480.webp",
+        "width": 480,
+        "height": 133,
+        "bytes": 18514
+      }
+    },
+    {
+      "file": "project-stairs.webp",
+      "width": 669,
+      "height": 186,
+      "bytes": 29432,
+      "source": "3.png",
+      "crop": [
+        756,
+        249,
+        1425,
+        435
+      ],
+      "small": {
+        "file": "project-stairs-480.webp",
+        "width": 480,
+        "height": 133,
+        "bytes": 17038
+      }
+    },
+    {
+      "file": "project-pergola.webp",
+      "width": 669,
+      "height": 188,
+      "bytes": 46652,
+      "source": "3.png",
+      "crop": [
+        63,
+        519,
+        732,
+        707
+      ],
+      "small": {
+        "file": "project-pergola-480.webp",
+        "width": 480,
+        "height": 135,
+        "bytes": 25590
+      }
+    },
+    {
+      "file": "project-railing.webp",
+      "width": 669,
+      "height": 188,
+      "bytes": 27798,
+      "source": "3.png",
+      "crop": [
+        756,
+        519,
+        1425,
+        707
+      ],
+      "small": {
+        "file": "project-railing-480.webp",
+        "width": 480,
+        "height": 135,
+        "bytes": 15678
+      }
+    }
+  ]
+}

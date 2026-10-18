@@ -4,6 +4,7 @@ import { whatsappNumber } from '../config';
 import { services } from '../data';
 import { buildWhatsAppMessage, buildWhatsAppUrl } from '../lib/whatsapp';
 import type { ContactDetails } from '../lib/whatsapp';
+import { trapDialogFocus } from '../lib/dialog';
 import './Contact.css';
 
 interface ContactProps {
@@ -153,7 +154,7 @@ export default function Contact({ selectedService, selectionVersion }: ContactPr
         </form>
       </div>
 
-      <dialog className="quote-dialog" ref={dialogRef} aria-labelledby="preview-title" aria-describedby="preview-description" onClose={() => setPreviewMessage(null)} onClick={(event) => {
+      <dialog className="quote-dialog" ref={dialogRef} aria-labelledby="preview-title" aria-describedby="preview-description" onKeyDown={trapDialogFocus} onClose={() => setPreviewMessage(null)} onClick={(event) => {
         if (event.target !== event.currentTarget) return;
         const bounds = event.currentTarget.getBoundingClientRect();
         if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) event.currentTarget.close();

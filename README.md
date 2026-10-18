@@ -68,4 +68,14 @@ A resolução da fonte limita o detalhe: o hero tem 780 × 750 px; a oficina, 75
 python scripts/prepare_assets.py --source-dir CAMINHO_DOS_MOCKUPS
 ```
 
-O projeto está pronto para gerar o build e ser implantado em uma hospedagem estática. Nenhuma publicação externa é feita pelos comandos acima.
+## Publicação no GitHub Pages
+
+Site: https://vit0r-maker.github.io/DEMO_SERRALHEIRIA/
+
+O workflow `.github/workflows/deploy.yml` instala as dependências, executa os testes de contato, gera o build e publica **somente `dist/`** a cada push na branch `main`. Também pode ser iniciado pela aba Actions. O deploy usa o token automático do GitHub; não exige um token pessoal no código.
+
+Em **Settings → Pages → Build and deployment → Source**, mantenha **GitHub Actions** selecionado. Publicar a raiz da branch diretamente entrega TypeScript sem compilar e resulta em página branca.
+
+O `base` de produção em `vite.config.ts` é `/DEMO_SERRALHEIRIA/`, respeitando as maiúsculas do nome do repositório. O desenvolvimento continua em `/`. Para visualizar o build localmente, execute `npm run build` e `npm run preview`, então abra o caminho `/DEMO_SERRALHEIRIA/` no endereço informado pelo Vite.
+
+Para testar esse mesmo build, defina `PLAYWRIGHT_BASE_URL` com o endereço completo da prévia, incluindo `/DEMO_SERRALHEIRIA/`, e execute `npm run test:e2e`. Opcionalmente, `PLAYWRIGHT_CHROMIUM_EXECUTABLE` pode apontar para um Chromium já instalado. Sem essas variáveis, os testes iniciam o servidor de desenvolvimento automaticamente.

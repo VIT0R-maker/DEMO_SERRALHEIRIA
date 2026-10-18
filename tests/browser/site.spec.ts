@@ -7,7 +7,7 @@ for (const width of [320, 360, 390, 768, 1024, 1440]) {
     page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
     await page.setViewportSize({ width, height: 1000 });
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    const response = await page.goto('/');
+    const response = await page.goto('./');
     expect(response?.status()).toBe(200);
     await page.evaluate(() => document.fonts.ready);
     await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
@@ -34,7 +34,7 @@ for (const width of [320, 360, 390, 768, 1024, 1440]) {
 
 test('serviços preenchem orçamento, validação e prévia copiada', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-  await page.goto('/');
+  await page.goto('./');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.getByRole('button', { name: 'Pedir orçamento para Escadas metálicas', exact: true }).click();
   await expect(page.locator('#quote-service')).toHaveValue('Escadas metálicas');
@@ -58,12 +58,12 @@ test('serviços preenchem orçamento, validação e prévia copiada', async ({ p
   await page.keyboard.press('Escape');
   await expect(dialog).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Continuar no WhatsApp' })).toBeFocused();
-  expect(await page.evaluate(() => document.body.style.overflow)).not.toBe('hidden');
+  await expect.poll(() => page.evaluate(() => document.body.style.overflow)).not.toBe('hidden');
   expect(context.pages()).toHaveLength(1);
 });
 
 test('galeria por teclado, navegação, contenção e retorno do foco', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('./');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const trigger = page.getByRole('button', { name: 'Ampliar projeto: Portão ripado' });
   await trigger.focus();
@@ -89,7 +89,7 @@ test('galeria por teclado, navegação, contenção e retorno do foco', async ({
 test('menu móvel, âncoras e movimento reduzido', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/');
+  await page.goto('./');
   const menu = page.getByRole('button', { name: 'Abrir menu' });
   await menu.click();
   await expect(page.getByRole('button', { name: 'Fechar menu' })).toHaveAttribute('aria-expanded', 'true');

@@ -58,32 +58,40 @@ As interações incluem menu compacto, navegação por âncoras, serviço preenc
 
 ## Introdução cinematográfica
 
-`src/components/IntroGate.tsx` mantém a página montada enquanto reproduz o portão em uma camada branca opaca. O evento real `ended` oculta o vídeo e inicia o único fade do overlay, revelando o site em 650 ms. O fundo e as animações existentes da página são preservados.
+A abertura começa com o portão fechado e uma seta animada sobre a maçaneta. Arraste para a direita, com mouse ou toque, para iniciar o filme com áudio. Não há quadro de boas-vindas, botão “Abrir o portão” nem controle “Ativar som”. A seta é um controle acessível sem aparência de botão: Enter, Espaço ou Seta para a direita também iniciam a abertura quando ela está focada. Pular e Escape continuam disponíveis.
 
-O vídeo em `public/media/gate-intro.mp4` foi preparado a partir do novo `gate-intro.mp4` fornecido: **1920 × 1080, 30 fps, 47 quadros e cerca de 1,58 s**, H.264 com faststart. A conversão de HEVC para H.264 amplia a compatibilidade; a trilha AAC estéreo original é copiada sem recompressão. O ritmo e o trecho branco final do arquivo são mantidos. `gate-poster.webp` contém o primeiro quadro.
+A posição da seta é calculada usando as coordenadas da maçaneta no vídeo original e o recorte real de `object-fit: cover`. O recorte é ajustado quando necessário para manter a maçaneta visível. Arrastos curtos, verticais, para a esquerda e gestos cancelados não iniciam a reprodução. A distância mínima varia de 40 a 72 px conforme a tela.
 
-A reprodução automática começa silenciada para respeitar as políticas dos navegadores. **Ativar som** libera a trilha durante a reprodução, sem reiniciar o vídeo; **Silenciar** desliga o áudio novamente. Os controles funcionam com toque, clique e teclado. Não é necessário ativar o som para entrar no site.
+| Variante | Arquivo fornecido | Imagem | Áudio original completo |
+| --- | --- | --- | --- |
+| Desktop | COMPUTADOR.mp4 | 1920 × 1080, 48 quadros, **1,600 s** | **4,179002 s** |
+| Celular | CELULAR.mp4 | 1080 × 1920, 54 quadros, **1,800 s** | **4,040 s** |
+
+Os arquivos publicados em `public/media/gate-desktop-v3.mp4` e `gate-mobile-v3.mp4` usam H.264 com faststart e AAC estéreo a 192 kbps. Apenas a imagem foi acelerada, removendo sua espera branca final excessiva. O áudio mantém velocidade, tom e duração da fonte, com limite preciso em amostras para não acrescentar padding AAC. O script verifica os tempos das duas faixas. Os posters WebP são os primeiros quadros de cada versão.
+
+O relógio real da mídia inicia o fade branco de **650 ms** ao atingir 1,6 s ou 1,8 s. O mesmo elemento continua tocando o áudio até `ended`, mesmo com o site já visível e interativo. O gesto do visitante é usado diretamente para autorizar áudio no navegador; não há tentativa de contornar suas políticas nem reprodução silenciosa alternativa. Pular, Escape, falha de mídia ou mudança para movimento reduzido interrompem o som.
 
 | Ajuste | Local |
 | --- | --- |
 | Fade normal e ao pular | `src/introConfig.ts`: `fadeMs` e `skipFadeMs`. |
-| Frequência | `src/introConfig.ts`: `frequency: 'session'` ou `'always'`. |
-| Chave da sessão | `src/introConfig.ts`: `storageKey`. |
-| Vídeo e poster | `src/introConfig.ts`: `videoPath` e `posterPath`, relativos ao `BASE_URL` do Vite. |
-| Enquadramento mobile | `src/components/IntroGate.css`: `--intro-video-position` na regra `max-aspect-ratio: 1/1`. |
-| Recuperação de falhas | `src/introConfig.ts`: `loadingTimeoutMs`, `stalledTimeoutMs` e `maxWaitMs`. |
+| Frequência e chave de sessão | `frequency` e `storageKey`. |
+| Vídeos, posters e tempos visuais | `media.desktop` e `media.mobile`. Os tempos devem corresponder aos arquivos preparados pelo script. |
+| Posição da maçaneta | `media.desktop.handle` e `media.mobile.handle`, em pixels do vídeo original. |
+| Seleção de celular | `mobileQuery`: até 767 px de largura ou tela de toque em paisagem com até 600 px de altura. |
+| Animação da seta | `src/components/IntroGate.css`: `gate-pull-hint`. |
+| Recuperação de falhas | `loadingTimeoutMs`, `stalledTimeoutMs` e `maxWaitMs`. |
 
-A introdução aparece uma vez por sessão da aba. Para revê-la, abra uma aba independente ou remova a chave `ferro-forma:intro:v2` do `sessionStorage` dessa origem. A nova chave permite que quem já viu o vídeo anterior veja esta atualização. Links com âncora, como `#contato`, e a preferência por movimento reduzido abrem diretamente o conteúdo. Se o armazenamento estiver bloqueado, a página continua funcionando.
+A variante é escolhida uma vez por abertura. Girar ou redimensionar a tela recalcula o recorte e a posição da seta, sem trocar ou reiniciar o filme. A introdução aparece uma vez por sessão da aba. Para revê-la, abra uma aba independente ou remova a chave `ferro-forma:intro:v4` do `sessionStorage`. Links com âncora e movimento reduzido apresentam diretamente o conteúdo.
 
-O botão **Pular introdução** funciona por toque e teclado. Durante a abertura, `inert` retira os controles da página da interação e da navegação por Tab, e a rolagem fica bloqueada com compensação da barra lateral. O fim da transição restaura tudo. Autoplay rejeitado, erro de mídia, carregamento superior a 4,5 s ou reprodução parada por 2,5 s liberam o site automaticamente; há ainda um limite total de segurança de 12 s. Esses timers são recuperação de falhas, não controlam a sequência normal.
+Durante a abertura, `inert` bloqueia a interação com a página e a rolagem é travada com compensação da barra lateral. O fade libera esses controles. Erro de mídia, carregamento superior a 4,5 s ou reprodução parada por 2,5 s liberam o site; existe limite total de 12 s após a tentativa de reprodução. A espera pelo gesto não é contada como falha.
 
-Para preparar novamente os assets, use Python com Pillow, FFmpeg e FFprobe:
+Para preparar os vídeos novamente, use Python com Pillow, FFmpeg e FFprobe:
 
 ```sh
-python scripts/prepare_intro.py --source CAMINHO_DO_VIDEO
+python scripts/prepare_intro.py --desktop CAMINHO_COMPUTADOR --mobile CAMINHO_CELULAR
 ```
 
-Os testes de `tests/browser/intro.spec.ts` exercitam a mídia real e simulam falhas de reprodução. Capturas e gravações de verificação ficam em `test-results/` e não são publicadas.
+Os testes de `tests/browser/intro.spec.ts` e `intro-autoplay.spec.ts` verificam mídia real, áudio após a revelação, mouse, toque, teclado, seleção responsiva, sessão e falhas. Capturas e gravações ficam em `test-results/` e não são publicadas.
 
 ## Fotografias
 

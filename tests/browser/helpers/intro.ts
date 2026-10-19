@@ -1,6 +1,17 @@
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
+export async function openGate(page: Page) {
+  const handle = page.getByRole('button', { name: /Arraste o portão para a direita/ });
+  await expect(handle).toBeVisible();
+  const bounds = await handle.boundingBox();
+  const x = bounds!.x + bounds!.width / 2, y = bounds!.y + bounds!.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 110, y, { steps: 8 });
+  await page.mouse.up();
+}
+
 interface IntroAuditEntry {
   kind: 'phase' | 'event' | 'frame';
   value: string;

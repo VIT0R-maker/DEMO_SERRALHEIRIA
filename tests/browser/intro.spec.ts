@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 import type { Route } from '@playwright/test';
 
-import { recordIntro, expectSiteAvailable } from './helpers/intro';
+import { recordIntro, expectSiteAvailable, openGate } from './helpers/intro';
 
-const sessionKey = 'ferro-forma:intro:v3';
+const sessionKey = 'ferro-forma:intro:v4';
 const mediaRoute = '**/media/gate-*-v3.mp4';
 
 // The recordings retain the actual moving transition for visual review.
@@ -29,6 +29,7 @@ for (const film of [
     const errors: string[] = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.goto('./', { waitUntil: 'domcontentloaded' });
+  await openGate(page);
     const overlay = page.locator('.intro-gate');
     const video = page.locator('.intro-gate-video');
     const site = page.locator('.intro-site');
@@ -97,10 +98,11 @@ test('celular em paisagem usa o filme vertical e só baixa a variante selecionad
   try {
     const page = await context.newPage();
     const requests: string[] = [];
-    page.on('request', request => { if (/gate-.*-v3\\.mp4/.test(request.url())) requests.push(request.url()); });
+    page.on('request', request => { if (/gate-.*-v3\.mp4/.test(request.url())) requests.push(request.url()); });
     await page.goto('./', { waitUntil: 'domcontentloaded' });
+  await openGate(page);
     await expect(page.locator('.intro-gate')).toHaveAttribute('data-phase', 'playing');
-    await expect(page.locator('.intro-gate-video')).toHaveAttribute('src', /gate-mobile-v3\\.mp4$/);
+    await expect(page.locator('.intro-gate-video')).toHaveAttribute('src', /gate-mobile-v3\.mp4$/);
     expect(requests.length).toBeGreaterThan(0);
     expect(requests.every(url => url.endsWith('gate-mobile-v3.mp4'))).toBe(true);
     await page.getByRole('button', { name: 'Pular introdução', exact: true }).click();
@@ -110,6 +112,7 @@ test('celular em paisagem usa o filme vertical e só baixa a variante selecionad
 
 test('pular pelo teclado interrompe o vídeo, libera rolagem e transfere foco para o conteúdo', async ({ page }) => {
   await page.goto('./', { waitUntil: 'domcontentloaded' });
+  await openGate(page);
   await expect(page.locator('.intro-gate')).toHaveAttribute('data-phase', 'playing');
   const video = await page.locator('.intro-gate-video').elementHandle();
   const skip = page.getByRole('button', { name: 'Pular introdução', exact: true });
@@ -127,6 +130,7 @@ test('pular pelo teclado interrompe o vídeo, libera rolagem e transfere foco pa
 
 test('a mesma sessão não repete a introdução; um contexto novo volta a exibi-la', async ({ page, browser, baseURL }) => {
   await page.goto('./', { waitUntil: 'domcontentloaded' });
+  await openGate(page);
   await page.getByRole('button', { name: 'Pular introdução', exact: true }).click();
   await expectSiteAvailable(page);
   await page.reload({ waitUntil: 'domcontentloaded' });
@@ -172,6 +176,7 @@ test('sessionStorage indisponível não impede a reprodução nem a liberação 
     });
   });
   await page.goto('./', { waitUntil: 'domcontentloaded' });
+  await openGate(page);
   await expect(page.locator('.intro-gate')).toHaveAttribute('data-phase', 'playing');
   await page.getByRole('button', { name: 'Pular introdução', exact: true }).click();
   await expectSiteAvailable(page);
@@ -187,6 +192,7 @@ test('erro de reprodução libera a página sem exigir interação', async ({ pa
     };
   });
   await page.goto('./', { waitUntil: 'domcontentloaded' });
+  await openGate(page);
   await expectSiteAvailable(page, 3000);
   expect(errors).toEqual([]);
 });
@@ -201,6 +207,7 @@ for (const mediaFailure of ['ausente', 'inválido'] as const) {
       body: mediaFailure === 'ausente' ? '' : 'invalid-media-for-decoder-recovery-test',
     }));
     await page.goto('./', { waitUntil: 'domcontentloaded' });
+
     await expectSiteAvailable(page, 3500);
     expect(errors).toEqual([]);
   });
@@ -211,6 +218,7 @@ test('carregamento sem resposta tem limite de espera e mantém o botão de pular
   await page.route(mediaRoute, (route) => { pendingRoutes.push(route); });
   try {
     await page.goto('./', { waitUntil: 'domcontentloaded' });
+  await openGate(page);
     await expect.poll(() => pendingRoutes.length).toBeGreaterThan(0);
     await expect(page.locator('.intro-gate')).toHaveAttribute('data-phase', 'loading');
     await expect(page.getByRole('button', { name: 'Pular introdução', exact: true })).toBeVisible();
@@ -223,6 +231,7 @@ test('carregamento sem resposta tem limite de espera e mantém o botão de pular
 
 test('reprodução sem progresso aciona recuperação em vez de prender o visitante', async ({ page }) => {
   await page.goto('./', { waitUntil: 'domcontentloaded' });
+  await openGate(page);
   await expect(page.locator('.intro-gate')).toHaveAttribute('data-phase', 'playing');
   await page.locator('.intro-gate-video').evaluate((element) => (element as HTMLVideoElement).pause());
   await expectSiteAvailable(page, 6500);
@@ -232,6 +241,7 @@ test('reprodução sem progresso aciona recuperação em vez de prender o visita
 test('redimensionar e girar a tela preserva o elemento e o progresso da reprodução', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('./', { waitUntil: 'domcontentloaded' });
+  await openGate(page);
   const video = page.locator('.intro-gate-video');
   await expect(page.locator('.intro-gate')).toHaveAttribute('data-phase', 'playing');
   let previousTime = await video.evaluate((element) => {
@@ -263,6 +273,14 @@ for (const viewport of [
   test(`enquadramento e página liberada em ${viewport.width}×${viewport.height}`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
     await page.goto('./', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.intro-gate')).toHaveAttribute('data-phase', 'ready');
+    const arrowBounds = await page.locator('.intro-gate-handle').boundingBox();
+    expect(arrowBounds!.x).toBeGreaterThanOrEqual(0);
+    expect(arrowBounds!.y).toBeGreaterThanOrEqual(0);
+    expect(arrowBounds!.x + arrowBounds!.width).toBeLessThanOrEqual(viewport.width);
+    expect(arrowBounds!.y + arrowBounds!.height).toBeLessThanOrEqual(viewport.height);
+    await page.screenshot({ path: testInfo.outputPath('handle-ready.png') });
+    await openGate(page);
     const overlay = page.locator('.intro-gate');
     const video = page.locator('.intro-gate-video');
     await expect(overlay).toHaveAttribute('data-phase', 'playing');
@@ -282,7 +300,7 @@ for (const viewport of [
     expect(skipBounds!.x + skipBounds!.width).toBeLessThanOrEqual(viewport.width);
     expect(skipBounds!.y + skipBounds!.height).toBeLessThanOrEqual(viewport.height);
     await expect(page.getByRole('button', { name: /Ativar som|Silenciar/ })).toHaveCount(0);
-    await expect(video).toHaveAttribute('src', viewport.width < 768 ? /gate-mobile-v3\\.mp4$/ : /gate-desktop-v3\\.mp4$/);
+    await expect(video).toHaveAttribute('src', viewport.width < 768 ? /gate-mobile-v3\.mp4$/ : /gate-desktop-v3\.mp4$/);
     await expect.poll(() => video.evaluate((element) => (element as HTMLVideoElement).currentTime)).toBeGreaterThan(0.35);
     await page.screenshot({ path: testInfo.outputPath(`intro-${viewport.width}x${viewport.height}.png`) });
     await expectSiteAvailable(page, 6500);

@@ -3,7 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { introConfig } from '../introConfig';
 import './IntroGate.css';
 
-type Phase = 'loading' | 'playing' | 'revealing' | 'done';
+type Phase = 'loading' | 'blocked' | 'playing' | 'revealing' | 'done';
 
 function shouldShowIntro() {
   if (window.location.hash || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
@@ -11,54 +11,70 @@ function shouldShowIntro() {
   try {
     return sessionStorage.getItem(introConfig.storageKey) !== 'seen';
   } catch {
-    // Storage can be disabled. The component still plays at most once per mount.
     return true;
   }
 }
 
 export default function IntroGate({ children }: { children: ReactNode }) {
   const [phase, setPhase] = useState<Phase>(() => shouldShowIntro() ? 'loading' : 'done');
+  // Select once: resizing/rotating must not replace the playing media or its audio.
+  const [media] = useState(() => window.matchMedia(introConfig.mobileQuery).matches ? introConfig.media.mobile : introConfig.media.desktop);
+  const [mediaActive, setMediaActive] = useState(phase !== 'done');
   const [fadeMs, setFadeMs] = useState(introConfig.fadeMs);
-  const [soundEnabled, setSoundEnabled] = useState(false);
   const phaseRef = useRef(phase);
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const skipRef = useRef<HTMLButtonElement>(null);
-  const soundRef = useRef<HTMLButtonElement>(null);
+  const startRef = useRef<HTMLButtonElement>(null);
   const restoreFocus = useRef(false);
+  const attemptedAt = useRef(0);
   const active = phase !== 'done';
 
   const complete = useCallback(() => {
     if (phaseRef.current === 'done') return;
     restoreFocus.current = overlayRef.current?.contains(document.activeElement) ?? false;
     phaseRef.current = 'done';
-    videoRef.current?.pause();
     setPhase('done');
+    // Keep the same media element playing until its original audio reaches ended.
   }, []);
 
   const reveal = useCallback((quick = false) => {
-    // ended, error, rejected play and the watchdog may arrive in the same turn.
     if (phaseRef.current === 'done' || phaseRef.current === 'revealing') return;
     phaseRef.current = 'revealing';
-    videoRef.current?.pause();
     setFadeMs(quick ? introConfig.skipFadeMs : introConfig.fadeMs);
     setPhase('revealing');
   }, []);
 
-  const toggleSound = () => {
+  const stopMedia = useCallback(() => {
+    videoRef.current?.pause();
+    setMediaActive(false);
+  }, []);
+
+  const skip = useCallback(() => {
+    stopMedia();
+    if (phaseRef.current === 'revealing') complete();
+    else reveal(true);
+  }, [stopMedia, complete, reveal]);
+
+  const startPlayback = useCallback(() => {
     const video = videoRef.current;
-    if (!video || phaseRef.current === 'revealing' || phaseRef.current === 'done') return;
-    // A user gesture permits sound while reliable autoplay starts muted.
-    const enable = video.muted;
-    video.muted = !enable;
-    setSoundEnabled(enable);
-    if (video.paused) {
-      void video.play().catch(() => {
-        video.muted = true;
-        setSoundEnabled(false);
-      });
-    }
-  };
+    if (!video || !['loading', 'blocked'].includes(phaseRef.current)) return;
+    attemptedAt.current = performance.now();
+    phaseRef.current = 'loading';
+    setPhase('loading');
+    video.muted = false;
+    video.volume = 1;
+    void video.play().catch((error: unknown) => {
+      if (videoRef.current !== video || !['loading', 'blocked'].includes(phaseRef.current)) return;
+      if (error instanceof DOMException && error.name === 'NotAllowedError') {
+        // Audible playback may require a real gesture. Never silently play instead.
+        phaseRef.current = 'blocked';
+        setPhase('blocked');
+      } else {
+        skip();
+      }
+    });
+  }, [skip]);
 
   useLayoutEffect(() => {
     if (!active) {
@@ -66,7 +82,6 @@ export default function IntroGate({ children }: { children: ReactNode }) {
         document.getElementById('conteudo')?.focus({ preventScroll: true });
         restoreFocus.current = false;
       }
-      // The browser may resolve the fragment before React mounts its target.
       if (window.location.hash) {
         try {
           document.getElementById(decodeURIComponent(window.location.hash.slice(1)))?.scrollIntoView({ behavior: 'instant' });
@@ -78,138 +93,116 @@ export default function IntroGate({ children }: { children: ReactNode }) {
     const previousOverflow = body.style.overflow;
     const previousPadding = body.style.paddingRight;
     const scrollbarWidth = window.innerWidth - documentElement.clientWidth;
-    if (scrollbarWidth > 0) {
-      body.style.paddingRight = `${parseFloat(getComputedStyle(body).paddingRight) + scrollbarWidth}px`;
-    }
+    if (scrollbarWidth > 0) body.style.paddingRight = String(parseFloat(getComputedStyle(body).paddingRight) + scrollbarWidth) + 'px';
     body.style.overflow = 'hidden';
     skipRef.current?.focus({ preventScroll: true });
-    try {
-      sessionStorage.setItem(introConfig.storageKey, 'seen');
-    } catch { /* Storage failures must never prevent access to the site. */ }
-    return () => {
-      body.style.overflow = previousOverflow;
-      body.style.paddingRight = previousPadding;
-    };
+    try { sessionStorage.setItem(introConfig.storageKey, 'seen'); } catch { /* Storage is optional. */ }
+    return () => { body.style.overflow = previousOverflow; body.style.paddingRight = previousPadding; };
   }, [active]);
 
   useEffect(() => {
-    if (!active) return;
+    if (phase === 'blocked') startRef.current?.focus({ preventScroll: true });
+  }, [phase]);
+
+  useEffect(() => {
+    if (!mediaActive) return;
     const video = videoRef.current;
-    if (!video) { complete(); return; }
-    let cancelled = false;
-    const startedAt = performance.now();
-    let progressedAt = startedAt;
+    if (!video) { skip(); return; }
+    let progressedAt = performance.now();
     let lastTime = video.currentTime;
-    let observedPlayback = false;
-
-    // The cancelled frame in StrictMode's first effect pass never starts playback.
-    // No seek, load(), loop or playbackRate change can restart the animation.
-    const startFrame = requestAnimationFrame(() => {
-      if (phaseRef.current === 'revealing' || phaseRef.current === 'done') return;
-      video.muted = true;
-      video.defaultMuted = true;
-      try {
-        void video.play().catch(() => { if (!cancelled) reveal(true); });
-      } catch {
-        reveal(true);
-      }
-    });
-
+    const startFrame = requestAnimationFrame(startPlayback);
     const watchdog = window.setInterval(() => {
-      if (phaseRef.current === 'revealing' || phaseRef.current === 'done') return;
       const now = performance.now();
-      if (phaseRef.current === 'playing' && !observedPlayback) {
-        observedPlayback = true;
-        progressedAt = now;
-      }
-      if (video.currentTime > lastTime + 0.005) {
-        lastTime = video.currentTime;
-        progressedAt = now;
-      }
-      const loadingExpired = phaseRef.current === 'loading' && now - startedAt >= introConfig.loadingTimeoutMs;
-      const stalled = phaseRef.current === 'playing' && now - progressedAt >= introConfig.stalledTimeoutMs;
-      if (loadingExpired || stalled || now - startedAt >= introConfig.maxWaitMs) reveal(true);
+      if (phaseRef.current === 'blocked') { progressedAt = now; return; }
+      if (video.currentTime > lastTime + 0.005) { lastTime = video.currentTime; progressedAt = now; }
+      const loadingExpired = phaseRef.current === 'loading' && now - attemptedAt.current >= introConfig.loadingTimeoutMs;
+      const stalled = phaseRef.current !== 'loading' && now - progressedAt >= introConfig.stalledTimeoutMs;
+      if (loadingExpired || stalled || now - attemptedAt.current >= introConfig.maxWaitMs) skip();
     }, 250);
-
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const motionChanged = () => { if (motion.matches) complete(); };
-    const hashChanged = () => { if (window.location.hash) complete(); };
+    const endImmediately = () => { stopMedia(); complete(); };
+    const motionChanged = () => { if (motion.matches) endImmediately(); };
+    const hashChanged = () => { if (window.location.hash && phaseRef.current !== 'done') endImmediately(); };
     motion.addEventListener('change', motionChanged);
     window.addEventListener('hashchange', hashChanged);
     return () => {
-      cancelled = true;
       cancelAnimationFrame(startFrame);
       clearInterval(watchdog);
       motion.removeEventListener('change', motionChanged);
       window.removeEventListener('hashchange', hashChanged);
       video.pause();
     };
-  }, [active, complete, reveal]);
+  }, [mediaActive, startPlayback, skip, stopMedia, complete]);
+
+  useEffect(() => {
+    if (phase !== 'playing') return;
+    let frame: number;
+    const checkVisualEnd = () => {
+      if ((videoRef.current?.currentTime ?? 0) >= media.animationSeconds) reveal();
+      else frame = requestAnimationFrame(checkVisualEnd);
+    };
+    frame = requestAnimationFrame(checkVisualEnd);
+    return () => cancelAnimationFrame(frame);
+  }, [phase, media.animationSeconds, reveal]);
 
   useEffect(() => {
     if (phase !== 'revealing') return;
-    // Safety net for a missing transitionend (background tab or browser setting).
     const timeout = window.setTimeout(complete, fadeMs + 100);
     return () => clearTimeout(timeout);
   }, [phase, fadeMs, complete]);
 
   return <>
     <div className="intro-site" inert={active} aria-hidden={active ? true : undefined}>{children}</div>
-    {active && <div
+    {(active || mediaActive) && <div
       ref={overlayRef}
       className="intro-gate"
       data-phase={phase}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Introdução do site"
-      style={{ '--intro-fade-ms': `${fadeMs}ms` } as CSSProperties}
+      role={active ? 'dialog' : undefined}
+      aria-modal={active ? true : undefined}
+      aria-label={active ? 'Introdução do site' : undefined}
+      aria-hidden={!active ? true : undefined}
+      style={{ '--intro-fade-ms': fadeMs + 'ms' } as CSSProperties}
       onTransitionEnd={event => {
         if (event.target === event.currentTarget && event.propertyName === 'opacity' && phaseRef.current === 'revealing') complete();
       }}
       onKeyDown={event => {
         if (event.key === 'Tab') {
-          if (!event.shiftKey && document.activeElement === skipRef.current) {
-            event.preventDefault(); soundRef.current?.focus();
-          } else if (event.shiftKey && document.activeElement === soundRef.current) {
-            event.preventDefault(); skipRef.current?.focus();
-          }
+          const buttons = event.currentTarget.querySelectorAll<HTMLButtonElement>('button');
+          const first = buttons[0], last = buttons[buttons.length - 1];
+          if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
         }
-        if (event.key === 'Escape') { event.preventDefault(); complete(); }
+        if (event.key === 'Escape') { event.preventDefault(); stopMedia(); complete(); }
       }}
     >
-      <video
+      {mediaActive && <video
         ref={videoRef}
         className="intro-gate-video"
-        src={`${import.meta.env.BASE_URL}${introConfig.videoPath}`}
-        poster={`${import.meta.env.BASE_URL}${introConfig.posterPath}`}
-        width="1920"
-        height="1080"
-        autoPlay
-        muted={!soundEnabled}
+        src={import.meta.env.BASE_URL + media.videoPath}
+        poster={import.meta.env.BASE_URL + media.posterPath}
+        width={media.width}
+        height={media.height}
         playsInline
         preload="auto"
         aria-hidden="true"
         tabIndex={-1}
         onPlaying={() => {
-          if (phaseRef.current === 'loading') { phaseRef.current = 'playing'; setPhase('playing'); }
+          if (['loading', 'blocked'].includes(phaseRef.current)) { phaseRef.current = 'playing'; setPhase('playing'); }
         }}
-        onEnded={() => reveal()}
-        onError={() => reveal(true)}
-        onVolumeChange={event => setSoundEnabled(!event.currentTarget.muted)}
-      />
-      <div className="intro-gate-controls">
-        <button ref={soundRef} className="intro-gate-control" type="button" aria-pressed={soundEnabled} onClick={toggleSound}>
-          <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M11 5 6 9H3v6h3l5 4V5Z" />
-            {soundEnabled ? <path d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" /> : <path d="m16 9 5 6m0-6-5 6" />}
-          </svg>
-          {soundEnabled ? 'Silenciar' : 'Ativar som'}
-        </button>
-        <button ref={skipRef} className="intro-gate-control intro-gate-skip" type="button" onClick={() => {
-          if (phaseRef.current === 'revealing') complete();
-          else reveal(true);
-        }}>Pular introdução<span aria-hidden="true">↗</span></button>
-      </div>
+        onTimeUpdate={event => { if (event.currentTarget.currentTime >= media.animationSeconds) reveal(); }}
+        onEnded={() => { setMediaActive(false); reveal(); }}
+        onError={skip}
+      />}
+      {active && <>
+        {phase === 'blocked' && <div className="intro-gate-start">
+          <span>FERRO & FORMA</span>
+          <button ref={startRef} className="intro-gate-control" type="button" onClick={startPlayback}>Abrir o portão <span aria-hidden="true">→</span></button>
+          <p>Toque para iniciar a experiência.</p>
+        </div>}
+        <div className="intro-gate-controls">
+          <button ref={skipRef} className="intro-gate-control intro-gate-skip" type="button" onClick={skip}>Pular introdução<span aria-hidden="true">↗</span></button>
+        </div>
+      </>}
     </div>}
   </>;
 }

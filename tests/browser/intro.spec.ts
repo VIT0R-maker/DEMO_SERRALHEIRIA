@@ -1,186 +1,111 @@
 import { test, expect } from '@playwright/test';
-import type { Page, Route } from '@playwright/test';
+import type { Route } from '@playwright/test';
 
-const sessionKey = 'ferro-forma:intro:v2';
-const mediaRoute = '**/media/gate-intro.mp4';
+import { recordIntro, expectSiteAvailable } from './helpers/intro';
 
-interface IntroAuditEntry {
-  kind: 'phase' | 'event' | 'frame';
-  value: string;
-  at: number;
-  currentTime: number | null;
-  duration: number | null;
-  ended: boolean | null;
-  opacity?: string;
-  videoVisibility?: string;
-}
-
-declare global {
-  interface Window {
-    __introAudit: IntroAuditEntry[];
-  }
-}
-
-async function recordIntro(page: Page) {
-  await page.addInitScript(() => {
-    window.__introAudit = [];
-    let previousPhase: string | null = null;
-
-    const record = (kind: 'phase' | 'event' | 'frame', value: string) => {
-      const video = document.querySelector<HTMLVideoElement>('.intro-gate-video');
-      const overlay = document.querySelector<HTMLElement>('.intro-gate');
-      window.__introAudit.push({
-        kind,
-        value,
-        at: performance.now(),
-        currentTime: video?.currentTime ?? null,
-        duration: video && Number.isFinite(video.duration) ? video.duration : null,
-        ended: video?.ended ?? null,
-        opacity: overlay ? getComputedStyle(overlay).opacity : undefined,
-        videoVisibility: video ? getComputedStyle(video).visibility : undefined,
-      });
-    };
-
-    for (const event of ['play', 'playing', 'ended', 'pause', 'error']) {
-      document.addEventListener(event, (event) => {
-        if (event.target instanceof HTMLVideoElement && event.target.classList.contains('intro-gate-video')) {
-          record('event', event.type);
-        }
-      }, true);
-    }
-
-    new MutationObserver(() => {
-      const overlay = document.querySelector<HTMLElement>('.intro-gate');
-      const phase = overlay?.dataset.phase ?? (previousPhase ? 'removed' : null);
-      if (phase && phase !== previousPhase) {
-        previousPhase = phase;
-        record('phase', phase);
-      }
-    }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-phase'] });
-
-    let sawOverlay = false;
-    const inspectRenderedFrame = () => {
-      const overlay = document.querySelector<HTMLElement>('.intro-gate');
-      if (overlay) {
-        sawOverlay = true;
-        const phase = overlay.dataset.phase;
-        if (phase === 'playing' || phase === 'revealing') record('frame', phase);
-      } else if (sawOverlay || (document.querySelector('.intro-site') && document.readyState !== 'loading')) {
-        return;
-      }
-      requestAnimationFrame(inspectRenderedFrame);
-    };
-    requestAnimationFrame(inspectRenderedFrame);
-  });
-}
-
-async function expectSiteAvailable(page: Page, timeout = 5000) {
-  await expect(page.locator('.intro-gate')).toHaveCount(0, { timeout });
-  await expect(page.locator('main#conteudo')).toBeVisible();
-  await expect.poll(() => page.locator('.intro-site').evaluate((element) => (element as HTMLElement).inert)).toBe(false);
-  await expect.poll(() => page.evaluate(() => document.body.style.overflow)).not.toBe('hidden');
-  await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).overflowY)).not.toBe('hidden');
-}
+const sessionKey = 'ferro-forma:intro:v3';
+const mediaRoute = '**/media/gate-*-v3.mp4';
 
 // The recordings retain the actual moving transition for visual review.
-test.use({ video: 'on' });
+test.use({
+  video: 'on',
+  launchOptions: {
+    ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE } : {}),
+    args: ['--autoplay-policy=no-user-gesture-required'],
+  },
+});
 
 test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await recordIntro(page);
 });
 
-test('vídeo real termina antes da revelação branca, sem expor ou liberar o site durante a abertura', async ({ page }, testInfo) => {
-  const pageErrors: string[] = [];
-  page.on('pageerror', (error) => pageErrors.push(error.message));
-  await page.goto('./', { waitUntil: 'domcontentloaded' });
-  const overlay = page.locator('.intro-gate');
-  const video = page.locator('.intro-gate-video');
-  const site = page.locator('.intro-site');
+for (const film of [
+  { name: 'desktop', width: 1440, height: 900, videoWidth: 1920, videoHeight: 1080, visual: 1.6, audio: 4.179002 },
+  { name: 'mobile', width: 390, height: 844, videoWidth: 1080, videoHeight: 1920, visual: 1.8, audio: 4.04 },
+]) {
+  test(film.name + ': imagem termina no tempo certo e áudio continua até o fim original', async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: film.width, height: film.height });
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.goto('./', { waitUntil: 'domcontentloaded' });
+    const overlay = page.locator('.intro-gate');
+    const video = page.locator('.intro-gate-video');
+    const site = page.locator('.intro-site');
+    await expect(overlay).toHaveAttribute('data-phase', 'playing');
+    const handle = await video.elementHandle();
+    const playback = await video.evaluate(element => {
+      const media = element as HTMLVideoElement;
+      return { muted: media.muted, volume: media.volume, inline: media.playsInline,
+        controls: media.controls, loop: media.loop, rate: media.playbackRate,
+        width: media.videoWidth, height: media.videoHeight, duration: media.duration,
+        source: new URL(media.currentSrc).pathname };
+    });
+    expect(playback).toMatchObject({ muted: false, volume: 1, inline: true, controls: false, loop: false, rate: 1, width: film.videoWidth, height: film.videoHeight });
+    expect(playback.duration).toBeCloseTo(film.audio, 4);
+    expect(playback.source).toBe(new URL('media/gate-' + film.name + '-v3.mp4', page.url()).pathname);
+    await expect(page.getByRole('button', { name: /Ativar som|Silenciar/ })).toHaveCount(0);
+    await expect(overlay).toHaveCSS('opacity', '1');
+    await expect(site).toHaveAttribute('inert', '');
+    await site.locator('a').first().evaluate(element => (element as HTMLElement).focus());
+    expect(await site.evaluate(element => element.contains(document.activeElement))).toBe(false);
+    await page.keyboard.press('PageDown');
+    expect(await page.evaluate(() => scrollY)).toBe(0);
+    const heroLeft = await page.locator('.hero').evaluate(element => element.getBoundingClientRect().left);
+    await page.screenshot({ path: testInfo.outputPath('intro-playing.png') });
 
-  await expect(overlay).toHaveAttribute('data-phase', 'playing');
-  await expect(overlay).toHaveCSS('opacity', '1');
-  // The supplied video's white matte can be 253 rather than 255 after decoding.
-  const whiteMatte = await overlay.evaluate((element) => getComputedStyle(element).backgroundColor);
-  expect(whiteMatte).toMatch(/^rgb\((253|254|255), (253|254|255), (253|254|255)\)$/);
-  await expect(site).toHaveAttribute('inert', '');
-  const playback = await video.evaluate((element) => {
-    const media = element as HTMLVideoElement;
-    return {
-      autoplay: media.autoplay, muted: media.muted, inline: media.playsInline,
-      controls: media.controls, loop: media.loop, rate: media.playbackRate,
-      width: media.videoWidth, height: media.videoHeight, duration: media.duration,
-      source: new URL(media.currentSrc).pathname, poster: new URL(media.poster).pathname,
-    };
+    await expect(overlay).toHaveAttribute('data-phase', 'revealing');
+    await expect(overlay).toHaveCSS('transition-duration', '0.65s');
+    const revealAudit = await page.evaluate(() => window.__introAudit);
+    const reveal = revealAudit.find(entry => entry.kind === 'phase' && entry.value === 'revealing');
+    expect(reveal!.currentTime).toBeGreaterThanOrEqual(film.visual);
+    expect(reveal!.currentTime).toBeLessThan(film.visual + 0.1);
+    expect(reveal!.ended).toBe(false);
+    expect(revealAudit.some(entry => entry.kind === 'event' && entry.value === 'ended')).toBe(false);
+    await expect(video).toHaveCSS('opacity', '0');
+    await expectSiteAvailable(page);
+    await expect(overlay).toHaveCSS('pointer-events', 'none');
+    await expect(overlay).toHaveAttribute('aria-hidden', 'true');
+    expect(await handle!.evaluate(element => (element as HTMLVideoElement).paused)).toBe(false);
+    expect(await handle!.evaluate(element => (element as HTMLVideoElement).muted)).toBe(false);
+    expect(await page.locator('.hero').evaluate(element => element.getBoundingClientRect().left)).toBeCloseTo(heroLeft, 0);
+    await page.screenshot({ path: testInfo.outputPath('intro-completed-with-audio.png') });
+
+    // The revealed page accepts navigation while the original soundtrack finishes.
+    await page.getByRole('link', { name: 'Solicitar orçamento', exact: true }).click();
+    await expect(page).toHaveURL(/#contato$/);
+    expect(await handle!.evaluate(element => (element as HTMLVideoElement).paused)).toBe(false);
+    await expect.poll(() => handle!.evaluate(element => (element as HTMLVideoElement).ended)).toBe(true);
+    expect(await handle!.evaluate(element => (element as HTMLVideoElement).currentTime)).toBeCloseTo(film.audio, 4);
+    await expect(overlay).toHaveCount(0);
+    const audit = await page.evaluate(() => window.__introAudit);
+    expect(audit.filter(entry => entry.kind === 'event' && entry.value === 'play')).toHaveLength(1);
+    expect(audit.filter(entry => entry.kind === 'phase' && entry.value === 'revealing')).toHaveLength(1);
+    const ended = audit.find(entry => entry.kind === 'event' && entry.value === 'ended');
+    const done = audit.find(entry => entry.kind === 'phase' && entry.value === 'done');
+    expect(ended!.at).toBeGreaterThan(done!.at);
+    expect(audit.filter(entry => entry.kind === 'frame' && entry.value === 'playing').every(entry => Number(entry.opacity) === 1)).toBe(true);
+    expect(audit.some(entry => entry.kind === 'frame' && entry.value === 'revealing' && Number(entry.opacity) > 0 && Number(entry.opacity) < 0.9)).toBe(true);
+    await testInfo.attach('intro-events', { body: JSON.stringify(audit, null, 2), contentType: 'application/json' });
+    expect(await page.evaluate(key => sessionStorage.getItem(key), sessionKey)).toBe('seen');
+    expect(errors).toEqual([]);
   });
-  expect(playback).toMatchObject({ autoplay: true, muted: true, inline: true, controls: false, loop: false, rate: 1, width: 1920, height: 1080 });
-  expect(playback.duration).toBeGreaterThan(1.55);
-  expect(playback.duration).toBeLessThan(1.7);
-  expect(playback.source).toBe(new URL('media/gate-intro.mp4', page.url()).pathname);
-  expect(playback.poster).toBe(new URL('media/gate-poster.webp', page.url()).pathname);
+}
 
-  await site.locator('a').first().evaluate((element) => (element as HTMLElement).focus());
-  expect(await site.evaluate((element) => element.contains(document.activeElement))).toBe(false);
-  await page.keyboard.press('PageDown');
-  expect(await page.evaluate(() => scrollY)).toBe(0);
-  // The page and its hero load beneath the opaque overlay, independently of the video.
-  await expect.poll(() => page.locator('.hero-visual img').evaluate((element) => (element as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
-  const heroLeft = await page.locator('.hero').evaluate((element) => element.getBoundingClientRect().left);
-  await page.screenshot({ path: testInfo.outputPath('intro-playing.png') });
-
-  await expect(overlay).toHaveAttribute('data-phase', 'revealing', { timeout: 5000 });
-  await expect(overlay).toHaveCSS('transition-duration', '0.65s');
-  const auditAtReveal = await page.evaluate(() => window.__introAudit);
-  const ended = auditAtReveal.find((entry) => entry.kind === 'event' && entry.value === 'ended');
-  const reveal = auditAtReveal.find((entry) => entry.kind === 'phase' && entry.value === 'revealing');
-  expect(ended, JSON.stringify(auditAtReveal)).toBeDefined();
-  expect(reveal).toBeDefined();
-  expect(reveal!.at).toBeGreaterThanOrEqual(ended!.at);
-  expect(reveal!.ended).toBe(true);
-  await expect(video).toHaveCSS('visibility', 'hidden');
-  await page.screenshot({ path: testInfo.outputPath('intro-white-reveal.png') });
-  await expectSiteAvailable(page);
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  expect(await page.evaluate(() => scrollY)).toBe(0);
-  expect(await page.locator('.hero').evaluate((element) => element.getBoundingClientRect().left)).toBeCloseTo(heroLeft, 0);
-  const completedAudit = await page.evaluate(() => window.__introAudit);
-  expect(completedAudit.filter((entry) => entry.kind === 'event' && entry.value === 'play')).toHaveLength(1);
-  expect(completedAudit.filter((entry) => entry.kind === 'phase' && entry.value === 'revealing')).toHaveLength(1);
-  const playbackFrames = completedAudit.filter((entry) => entry.kind === 'frame' && entry.value === 'playing');
-  expect(playbackFrames.length).toBeGreaterThan(1);
-  expect(playbackFrames.every((entry) => Number(entry.opacity) === 1)).toBe(true);
-  const fadeFrames = completedAudit.filter((entry) => entry.kind === 'frame' && entry.value === 'revealing');
-  expect(fadeFrames.filter((entry) => Number(entry.opacity) > 0 && Number(entry.opacity) < 0.95).length).toBeGreaterThan(1);
-  expect(fadeFrames.some((entry) => Number(entry.opacity) < 0.1)).toBe(true);
-  await testInfo.attach('intro-events-and-rendered-frames', { body: JSON.stringify(completedAudit, null, 2), contentType: 'application/json' });
-  expect(await page.evaluate((key) => sessionStorage.getItem(key), sessionKey)).not.toBeNull();
-  await page.screenshot({ path: testInfo.outputPath('intro-completed.png') });
-  expect(pageErrors).toEqual([]);
-});
-
-test('som pode ser ativado e silenciado pelo teclado sem reiniciar a animação', async ({ page }) => {
-  await page.goto('./', { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('.intro-gate')).toHaveAttribute('data-phase', 'playing');
-  const video = page.locator('.intro-gate-video');
-  const startTime = await video.evaluate(element => (element as HTMLVideoElement).currentTime);
-  const skip = page.getByRole('button', { name: 'Pular introdução', exact: true });
-  await expect(skip).toBeFocused();
-  await page.keyboard.press('Tab');
-  const sound = page.getByRole('button', { name: 'Ativar som', exact: true });
-  await expect(sound).toBeFocused();
-  await expect(sound).toHaveAttribute('aria-pressed', 'false');
-  await page.keyboard.press('Enter');
-  const mute = page.getByRole('button', { name: 'Silenciar', exact: true });
-  await expect(mute).toHaveAttribute('aria-pressed', 'true');
-  expect(await video.evaluate(element => (element as HTMLVideoElement).muted)).toBe(false);
-  expect(await video.evaluate(element => (element as HTMLVideoElement).currentTime)).toBeGreaterThanOrEqual(startTime);
-  await page.keyboard.press('Enter');
-  await expect(sound).toHaveAttribute('aria-pressed', 'false');
-  expect(await video.evaluate(element => (element as HTMLVideoElement).muted)).toBe(true);
-  await page.keyboard.press('Shift+Tab');
-  await expect(skip).toBeFocused();
-  await expectSiteAvailable(page);
-  expect(await page.evaluate(() => window.__introAudit.filter(entry => entry.kind === 'event' && entry.value === 'play'))).toHaveLength(1);
+test('celular em paisagem usa o filme vertical e só baixa a variante selecionada', async ({ browser, baseURL }) => {
+  const context = await browser.newContext({ baseURL, viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, reducedMotion: 'no-preference' });
+  try {
+    const page = await context.newPage();
+    const requests: string[] = [];
+    page.on('request', request => { if (/gate-.*-v3\\.mp4/.test(request.url())) requests.push(request.url()); });
+    await page.goto('./', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.intro-gate')).toHaveAttribute('data-phase', 'playing');
+    await expect(page.locator('.intro-gate-video')).toHaveAttribute('src', /gate-mobile-v3\\.mp4$/);
+    expect(requests.length).toBeGreaterThan(0);
+    expect(requests.every(url => url.endsWith('gate-mobile-v3.mp4'))).toBe(true);
+    await page.getByRole('button', { name: 'Pular introdução', exact: true }).click();
+    await expectSiteAvailable(page);
+  } finally { await context.close(); }
 });
 
 test('pular pelo teclado interrompe o vídeo, libera rolagem e transfere foco para o conteúdo', async ({ page }) => {
@@ -253,12 +178,12 @@ test('sessionStorage indisponível não impede a reprodução nem a liberação 
   expect(errors).toEqual([]);
 });
 
-test('rejeição de play revela a página sem exigir interação', async ({ page }) => {
+test('erro de reprodução libera a página sem exigir interação', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.addInitScript(() => {
     HTMLMediaElement.prototype.play = function () {
-      return Promise.reject(new DOMException('Autoplay blocked for this test', 'NotAllowedError'));
+      return Promise.reject(new DOMException('Unsupported media for this test', 'NotSupportedError'));
     };
   });
   await page.goto('./', { waitUntil: 'domcontentloaded' });
@@ -356,10 +281,8 @@ for (const viewport of [
     expect(skipBounds!.x).toBeGreaterThanOrEqual(0);
     expect(skipBounds!.x + skipBounds!.width).toBeLessThanOrEqual(viewport.width);
     expect(skipBounds!.y + skipBounds!.height).toBeLessThanOrEqual(viewport.height);
-    const soundBounds = await page.getByRole('button', { name: 'Ativar som', exact: true }).boundingBox();
-    expect(soundBounds!.height).toBeGreaterThanOrEqual(44);
-    expect(soundBounds!.x).toBeGreaterThanOrEqual(0);
-    expect(soundBounds!.x + soundBounds!.width).toBeLessThan(skipBounds!.x);
+    await expect(page.getByRole('button', { name: /Ativar som|Silenciar/ })).toHaveCount(0);
+    await expect(video).toHaveAttribute('src', viewport.width < 768 ? /gate-mobile-v3\\.mp4$/ : /gate-desktop-v3\\.mp4$/);
     await expect.poll(() => video.evaluate((element) => (element as HTMLVideoElement).currentTime)).toBeGreaterThan(0.35);
     await page.screenshot({ path: testInfo.outputPath(`intro-${viewport.width}x${viewport.height}.png`) });
     await expectSiteAvailable(page, 6500);

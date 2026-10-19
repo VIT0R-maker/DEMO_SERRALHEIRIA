@@ -24,10 +24,30 @@
   pointer-events: none;
 }
 
-/* Hide the final white frame against an identical opaque white surface.
-   Only the overlay fades; the mounted site has no transform or opacity. */
-.intro-gate[data-phase='revealing'] { opacity: 0; }
-.intro-gate[data-phase='revealing'] .intro-gate-video { visibility: hidden; }
+/* Keep the media mounted for its full audio; only its image disappears. */
+.intro-gate[data-phase='revealing'], .intro-gate[data-phase='done'] { opacity: 0; }
+.intro-gate[data-phase='revealing'] .intro-gate-video,
+.intro-gate[data-phase='done'] .intro-gate-video { opacity: 0; }
+.intro-gate[data-phase='done'] { pointer-events: none; }
+
+.intro-gate-start {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  width: min(340px, calc(100% - 40px));
+  padding: 30px 20px;
+  border: 1px solid #ffffff30;
+  border-radius: 8px;
+  color: #f4f2ed;
+  background: #202522f2;
+  text-align: center;
+}
+.intro-gate-start > span { font-size: 12px; letter-spacing: .18em; font-weight: 700; }
+.intro-gate-start p { font-size: 12px; line-height: 1.6; }
+.intro-gate-start .intro-gate-control { padding-inline: 24px; min-height: 50px; }
 
 .intro-gate-controls {
   position: absolute;
@@ -63,8 +83,7 @@
   .intro-gate-control:hover { background: #e3dfd5; border-color: #646762; }
 }
 @media (max-aspect-ratio: 1/1) {
-  /* Follow the right-hand exit so the opening stays visible in portrait. */
-  .intro-gate { --intro-video-position: 100% 50%; }
+  /* Portrait screens use their own 1080 × 1920 film. */
   .intro-gate-controls {
     right: max(18px, env(safe-area-inset-right));
     bottom: max(20px, env(safe-area-inset-bottom));

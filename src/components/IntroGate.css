@@ -1,0 +1,68 @@
+.intro-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background: #fff;
+  opacity: 1;
+  transition: opacity var(--intro-fade-ms, 900ms) ease-in-out;
+  --intro-video-position: 50% 50%;
+}
+
+.intro-gate-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: var(--intro-video-position);
+  background: #fff;
+  pointer-events: none;
+}
+
+/* Hide the final white frame against an identical opaque white surface.
+   Only the overlay fades; the mounted site has no transform or opacity. */
+.intro-gate[data-phase='revealing'] { opacity: 0; }
+.intro-gate[data-phase='revealing'] .intro-gate-video { visibility: hidden; }
+
+.intro-gate-skip {
+  position: absolute;
+  right: max(24px, env(safe-area-inset-right));
+  bottom: max(24px, env(safe-area-inset-bottom));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 46px;
+  padding: 12px 18px;
+  border: 1px solid #a7aaa3;
+  border-radius: 5px;
+  background: #f4f2ed;
+  color: #202522;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.intro-gate-skip span { font-size: 19px; line-height: 1; }
+.intro-gate-skip:focus-visible { outline: 3px solid #ad4326; outline-offset: 4px; }
+.intro-gate-skip:active { background: #e3dfd5; }
+
+@media (hover: hover) and (pointer: fine) {
+  .intro-gate-skip:hover { background: #e3dfd5; border-color: #646762; }
+}
+@media (max-aspect-ratio: 1/1) {
+  /* Follow the right-hand exit so the opening stays visible in portrait. */
+  .intro-gate { --intro-video-position: 100% 50%; }
+  .intro-gate-skip {
+    right: max(18px, env(safe-area-inset-right));
+    bottom: max(20px, env(safe-area-inset-bottom));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .intro-gate { transition: none; }
+}

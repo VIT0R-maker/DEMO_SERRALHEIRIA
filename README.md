@@ -56,6 +56,33 @@ Com um número válido configurado, o botão abre `https://wa.me/NUMERO?text=MEN
 
 As interações incluem menu compacto, navegação por âncoras, serviço preenchendo o formulário, lightbox com teclado, fechamento de diálogos com Escape, restauração de foco e preferência por movimento reduzido.
 
+## Introdução cinematográfica
+
+`src/components/IntroGate.tsx` mantém a página montada enquanto reproduz o portão em uma camada branca opaca. O evento real `ended` oculta o vídeo e inicia o único fade do overlay, revelando o site em 900 ms. O fundo e as animações existentes da página são preservados.
+
+O vídeo em `public/media/gate-intro.mp4` foi preparado a partir do arquivo fornecido: **1920 × 1080, 30 fps, 95 quadros e 3,166667 s**, H.264 sem áudio, com faststart. A conversão de HEVC para H.264 foi necessária para ampliar a compatibilidade. O portão desaparece em aproximadamente 2,17 s; o trecho branco final original é mantido. `gate-poster.webp` contém o primeiro quadro.
+
+| Ajuste | Local |
+| --- | --- |
+| Fade normal e ao pular | `src/introConfig.ts`: `fadeMs` e `skipFadeMs`. |
+| Frequência | `src/introConfig.ts`: `frequency: 'session'` ou `'always'`. |
+| Chave da sessão | `src/introConfig.ts`: `storageKey`. |
+| Vídeo e poster | `src/introConfig.ts`: `videoPath` e `posterPath`, relativos ao `BASE_URL` do Vite. |
+| Enquadramento mobile | `src/components/IntroGate.css`: `--intro-video-position` na regra `max-aspect-ratio: 1/1`. |
+| Recuperação de falhas | `src/introConfig.ts`: `loadingTimeoutMs`, `stalledTimeoutMs` e `maxWaitMs`. |
+
+A introdução aparece uma vez por sessão da aba. Para revê-la, abra uma aba independente ou remova a chave `ferro-forma:intro:v1` do `sessionStorage` dessa origem. Links com âncora, como `#contato`, e a preferência por movimento reduzido abrem diretamente o conteúdo. Se o armazenamento estiver bloqueado, a página continua funcionando.
+
+O botão **Pular introdução** funciona por toque e teclado. Durante a abertura, `inert` retira os controles da página da interação e da navegação por Tab, e a rolagem fica bloqueada com compensação da barra lateral. O fim da transição restaura tudo. Autoplay rejeitado, erro de mídia, carregamento superior a 4,5 s ou reprodução parada por 2,5 s liberam o site automaticamente; há ainda um limite total de segurança de 12 s. Esses timers são recuperação de falhas, não controlam a sequência normal.
+
+Para preparar novamente os assets, use Python com Pillow, FFmpeg e FFprobe:
+
+```sh
+python scripts/prepare_intro.py --source CAMINHO_DO_VIDEO
+```
+
+Os testes de `tests/browser/intro.spec.ts` exercitam a mídia real e simulam falhas de reprodução. Capturas e gravações de verificação ficam em `test-results/` e não são publicadas.
+
 ## Fotografias
 
 As fotografias disponíveis foram recortadas dos mockups originais, excluindo textos e legendas gravados nos pixels. As legendas do site são HTML. As imagens foram exportadas em WebP, sem ampliação artificial, com variantes de 480 px de largura.

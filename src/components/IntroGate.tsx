@@ -19,10 +19,12 @@ function shouldShowIntro() {
 export default function IntroGate({ children }: { children: ReactNode }) {
   const [phase, setPhase] = useState<Phase>(() => shouldShowIntro() ? 'loading' : 'done');
   const [fadeMs, setFadeMs] = useState(introConfig.fadeMs);
+  const [soundEnabled, setSoundEnabled] = useState(false);
   const phaseRef = useRef(phase);
   const videoRef = useRef<HTMLVideoElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const skipRef = useRef<HTMLButtonElement>(null);
+  const soundRef = useRef<HTMLButtonElement>(null);
   const restoreFocus = useRef(false);
   const active = phase !== 'done';
 
@@ -43,11 +45,32 @@ export default function IntroGate({ children }: { children: ReactNode }) {
     setPhase('revealing');
   }, []);
 
+  const toggleSound = () => {
+    const video = videoRef.current;
+    if (!video || phaseRef.current === 'revealing' || phaseRef.current === 'done') return;
+    // A user gesture permits sound while reliable autoplay starts muted.
+    const enable = video.muted;
+    video.muted = !enable;
+    setSoundEnabled(enable);
+    if (video.paused) {
+      void video.play().catch(() => {
+        video.muted = true;
+        setSoundEnabled(false);
+      });
+    }
+  };
+
   useLayoutEffect(() => {
     if (!active) {
       if (restoreFocus.current) {
         document.getElementById('conteudo')?.focus({ preventScroll: true });
         restoreFocus.current = false;
+      }
+      // The browser may resolve the fragment before React mounts its target.
+      if (window.location.hash) {
+        try {
+          document.getElementById(decodeURIComponent(window.location.hash.slice(1)))?.scrollIntoView({ behavior: 'instant' });
+        } catch { /* A malformed fragment must not interrupt the page. */ }
       }
       return;
     }
@@ -144,7 +167,13 @@ export default function IntroGate({ children }: { children: ReactNode }) {
         if (event.target === event.currentTarget && event.propertyName === 'opacity' && phaseRef.current === 'revealing') complete();
       }}
       onKeyDown={event => {
-        if (event.key === 'Tab') { event.preventDefault(); skipRef.current?.focus(); }
+        if (event.key === 'Tab') {
+          if (!event.shiftKey && document.activeElement === skipRef.current) {
+            event.preventDefault(); soundRef.current?.focus();
+          } else if (event.shiftKey && document.activeElement === soundRef.current) {
+            event.preventDefault(); skipRef.current?.focus();
+          }
+        }
         if (event.key === 'Escape') { event.preventDefault(); complete(); }
       }}
     >
@@ -156,7 +185,7 @@ export default function IntroGate({ children }: { children: ReactNode }) {
         width="1920"
         height="1080"
         autoPlay
-        muted
+        muted={!soundEnabled}
         playsInline
         preload="auto"
         aria-hidden="true"
@@ -166,11 +195,21 @@ export default function IntroGate({ children }: { children: ReactNode }) {
         }}
         onEnded={() => reveal()}
         onError={() => reveal(true)}
+        onVolumeChange={event => setSoundEnabled(!event.currentTarget.muted)}
       />
-      <button ref={skipRef} className="intro-gate-skip" type="button" onClick={() => {
-        if (phaseRef.current === 'revealing') complete();
-        else reveal(true);
-      }}>Pular introdução<span aria-hidden="true">↗</span></button>
+      <div className="intro-gate-controls">
+        <button ref={soundRef} className="intro-gate-control" type="button" aria-pressed={soundEnabled} onClick={toggleSound}>
+          <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11 5 6 9H3v6h3l5 4V5Z" />
+            {soundEnabled ? <path d="M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" /> : <path d="m16 9 5 6m0-6-5 6" />}
+          </svg>
+          {soundEnabled ? 'Silenciar' : 'Ativar som'}
+        </button>
+        <button ref={skipRef} className="intro-gate-control intro-gate-skip" type="button" onClick={() => {
+          if (phaseRef.current === 'revealing') complete();
+          else reveal(true);
+        }}>Pular introdução<span aria-hidden="true">↗</span></button>
+      </div>
     </div>}
   </>;
 }

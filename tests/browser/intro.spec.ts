@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import type { Page, Route } from '@playwright/test';
 
-const sessionKey = 'ferro-forma:intro:v1';
+const sessionKey = 'ferro-forma:intro:v2';
 const mediaRoute = '**/media/gate-intro.mp4';
 
 interface IntroAuditEntry {
@@ -114,8 +114,8 @@ test('vídeo real termina antes da revelação branca, sem expor ou liberar o si
     };
   });
   expect(playback).toMatchObject({ autoplay: true, muted: true, inline: true, controls: false, loop: false, rate: 1, width: 1920, height: 1080 });
-  expect(playback.duration).toBeGreaterThan(2.9);
-  expect(playback.duration).toBeLessThan(3.5);
+  expect(playback.duration).toBeGreaterThan(1.55);
+  expect(playback.duration).toBeLessThan(1.7);
   expect(playback.source).toBe(new URL('media/gate-intro.mp4', page.url()).pathname);
   expect(playback.poster).toBe(new URL('media/gate-poster.webp', page.url()).pathname);
 
@@ -129,6 +129,7 @@ test('vídeo real termina antes da revelação branca, sem expor ou liberar o si
   await page.screenshot({ path: testInfo.outputPath('intro-playing.png') });
 
   await expect(overlay).toHaveAttribute('data-phase', 'revealing', { timeout: 5000 });
+  await expect(overlay).toHaveCSS('transition-duration', '0.65s');
   const auditAtReveal = await page.evaluate(() => window.__introAudit);
   const ended = auditAtReveal.find((entry) => entry.kind === 'event' && entry.value === 'ended');
   const reveal = auditAtReveal.find((entry) => entry.kind === 'phase' && entry.value === 'revealing');
@@ -155,6 +156,31 @@ test('vídeo real termina antes da revelação branca, sem expor ou liberar o si
   expect(await page.evaluate((key) => sessionStorage.getItem(key), sessionKey)).not.toBeNull();
   await page.screenshot({ path: testInfo.outputPath('intro-completed.png') });
   expect(pageErrors).toEqual([]);
+});
+
+test('som pode ser ativado e silenciado pelo teclado sem reiniciar a animação', async ({ page }) => {
+  await page.goto('./', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.intro-gate')).toHaveAttribute('data-phase', 'playing');
+  const video = page.locator('.intro-gate-video');
+  const startTime = await video.evaluate(element => (element as HTMLVideoElement).currentTime);
+  const skip = page.getByRole('button', { name: 'Pular introdução', exact: true });
+  await expect(skip).toBeFocused();
+  await page.keyboard.press('Tab');
+  const sound = page.getByRole('button', { name: 'Ativar som', exact: true });
+  await expect(sound).toBeFocused();
+  await expect(sound).toHaveAttribute('aria-pressed', 'false');
+  await page.keyboard.press('Enter');
+  const mute = page.getByRole('button', { name: 'Silenciar', exact: true });
+  await expect(mute).toHaveAttribute('aria-pressed', 'true');
+  expect(await video.evaluate(element => (element as HTMLVideoElement).muted)).toBe(false);
+  expect(await video.evaluate(element => (element as HTMLVideoElement).currentTime)).toBeGreaterThanOrEqual(startTime);
+  await page.keyboard.press('Enter');
+  await expect(sound).toHaveAttribute('aria-pressed', 'false');
+  expect(await video.evaluate(element => (element as HTMLVideoElement).muted)).toBe(true);
+  await page.keyboard.press('Shift+Tab');
+  await expect(skip).toBeFocused();
+  await expectSiteAvailable(page);
+  expect(await page.evaluate(() => window.__introAudit.filter(entry => entry.kind === 'event' && entry.value === 'play'))).toHaveLength(1);
 });
 
 test('pular pelo teclado interrompe o vídeo, libera rolagem e transfere foco para o conteúdo', async ({ page }) => {
@@ -306,6 +332,7 @@ for (const viewport of [
   { width: 768, height: 1024 },
   { width: 390, height: 844 },
   { width: 360, height: 800 },
+  { width: 320, height: 568 },
   { width: 844, height: 390 },
 ]) {
   test(`enquadramento e página liberada em ${viewport.width}×${viewport.height}`, async ({ page }, testInfo) => {
@@ -329,6 +356,10 @@ for (const viewport of [
     expect(skipBounds!.x).toBeGreaterThanOrEqual(0);
     expect(skipBounds!.x + skipBounds!.width).toBeLessThanOrEqual(viewport.width);
     expect(skipBounds!.y + skipBounds!.height).toBeLessThanOrEqual(viewport.height);
+    const soundBounds = await page.getByRole('button', { name: 'Ativar som', exact: true }).boundingBox();
+    expect(soundBounds!.height).toBeGreaterThanOrEqual(44);
+    expect(soundBounds!.x).toBeGreaterThanOrEqual(0);
+    expect(soundBounds!.x + soundBounds!.width).toBeLessThan(skipBounds!.x);
     await expect.poll(() => video.evaluate((element) => (element as HTMLVideoElement).currentTime)).toBeGreaterThan(0.35);
     await page.screenshot({ path: testInfo.outputPath(`intro-${viewport.width}x${viewport.height}.png`) });
     await expectSiteAvailable(page, 6500);

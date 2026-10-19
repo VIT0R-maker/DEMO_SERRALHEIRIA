@@ -58,9 +58,11 @@ As interações incluem menu compacto, navegação por âncoras, serviço preenc
 
 ## Introdução cinematográfica
 
-`src/components/IntroGate.tsx` mantém a página montada enquanto reproduz o portão em uma camada branca opaca. O evento real `ended` oculta o vídeo e inicia o único fade do overlay, revelando o site em 900 ms. O fundo e as animações existentes da página são preservados.
+`src/components/IntroGate.tsx` mantém a página montada enquanto reproduz o portão em uma camada branca opaca. O evento real `ended` oculta o vídeo e inicia o único fade do overlay, revelando o site em 650 ms. O fundo e as animações existentes da página são preservados.
 
-O vídeo em `public/media/gate-intro.mp4` foi preparado a partir do arquivo fornecido: **1920 × 1080, 30 fps, 95 quadros e 3,166667 s**, H.264 sem áudio, com faststart. A conversão de HEVC para H.264 foi necessária para ampliar a compatibilidade. O portão desaparece em aproximadamente 2,17 s; o trecho branco final original é mantido. `gate-poster.webp` contém o primeiro quadro.
+O vídeo em `public/media/gate-intro.mp4` foi preparado a partir do novo `gate-intro.mp4` fornecido: **1920 × 1080, 30 fps, 47 quadros e cerca de 1,58 s**, H.264 com faststart. A conversão de HEVC para H.264 amplia a compatibilidade; a trilha AAC estéreo original é copiada sem recompressão. O ritmo e o trecho branco final do arquivo são mantidos. `gate-poster.webp` contém o primeiro quadro.
+
+A reprodução automática começa silenciada para respeitar as políticas dos navegadores. **Ativar som** libera a trilha durante a reprodução, sem reiniciar o vídeo; **Silenciar** desliga o áudio novamente. Os controles funcionam com toque, clique e teclado. Não é necessário ativar o som para entrar no site.
 
 | Ajuste | Local |
 | --- | --- |
@@ -71,7 +73,7 @@ O vídeo em `public/media/gate-intro.mp4` foi preparado a partir do arquivo forn
 | Enquadramento mobile | `src/components/IntroGate.css`: `--intro-video-position` na regra `max-aspect-ratio: 1/1`. |
 | Recuperação de falhas | `src/introConfig.ts`: `loadingTimeoutMs`, `stalledTimeoutMs` e `maxWaitMs`. |
 
-A introdução aparece uma vez por sessão da aba. Para revê-la, abra uma aba independente ou remova a chave `ferro-forma:intro:v1` do `sessionStorage` dessa origem. Links com âncora, como `#contato`, e a preferência por movimento reduzido abrem diretamente o conteúdo. Se o armazenamento estiver bloqueado, a página continua funcionando.
+A introdução aparece uma vez por sessão da aba. Para revê-la, abra uma aba independente ou remova a chave `ferro-forma:intro:v2` do `sessionStorage` dessa origem. A nova chave permite que quem já viu o vídeo anterior veja esta atualização. Links com âncora, como `#contato`, e a preferência por movimento reduzido abrem diretamente o conteúdo. Se o armazenamento estiver bloqueado, a página continua funcionando.
 
 O botão **Pular introdução** funciona por toque e teclado. Durante a abertura, `inert` retira os controles da página da interação e da navegação por Tab, e a rolagem fica bloqueada com compensação da barra lateral. O fim da transição restaura tudo. Autoplay rejeitado, erro de mídia, carregamento superior a 4,5 s ou reprodução parada por 2,5 s liberam o site automaticamente; há ainda um limite total de segurança de 12 s. Esses timers são recuperação de falhas, não controlam a sequência normal.
 

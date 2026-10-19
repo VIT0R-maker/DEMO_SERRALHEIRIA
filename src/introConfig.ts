@@ -11,10 +11,10 @@ export const introConfig: {
   maxWaitMs: number;
 } = {
   frequency: 'session',
-  storageKey: 'ferro-forma:intro:v1',
+  storageKey: 'ferro-forma:intro:v2',
   videoPath: 'media/gate-intro.mp4',
   posterPath: 'media/gate-poster.webp',
-  fadeMs: 900,
+  fadeMs: 650,
   skipFadeMs: 120,
   loadingTimeoutMs: 4500,
   stalledTimeoutMs: 2500,

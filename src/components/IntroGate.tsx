@@ -183,6 +183,7 @@ export default function IntroGate({ children }: { children: ReactNode }) {
       ref={overlayRef}
       className="intro-gate"
       data-phase={phase}
+      data-variant={media === introConfig.media.mobile ? 'mobile' : 'desktop'}
       data-dragging={dragOffset !== null ? 'true' : undefined}
       role={active ? 'dialog' : undefined}
       aria-modal={active ? true : undefined}

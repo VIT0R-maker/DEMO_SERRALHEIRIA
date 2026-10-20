@@ -3,8 +3,8 @@ import type { Route } from '@playwright/test';
 
 import { recordIntro, expectSiteAvailable, openGate } from './helpers/intro';
 
-const sessionKey = 'ferro-forma:intro:v4';
-const mediaRoute = '**/media/gate-*-v3.mp4';
+const sessionKey = 'ferro-forma:intro:v5';
+const mediaRoute = '**/media/gate-*-v4.mp4';
 
 // The recordings retain the actual moving transition for visual review.
 test.use({
@@ -44,7 +44,7 @@ for (const film of [
     });
     expect(playback).toMatchObject({ muted: false, volume: 1, inline: true, controls: false, loop: false, rate: 1, width: film.videoWidth, height: film.videoHeight });
     expect(playback.duration).toBeCloseTo(film.audio, 4);
-    expect(playback.source).toBe(new URL('media/gate-' + film.name + '-v3.mp4', page.url()).pathname);
+    expect(playback.source).toBe(new URL('media/gate-' + film.name + '-v4.mp4', page.url()).pathname);
     await expect(page.getByRole('button', { name: /Ativar som|Silenciar/ })).toHaveCount(0);
     await expect(overlay).toHaveCSS('opacity', '1');
     await expect(site).toHaveAttribute('inert', '');
@@ -98,13 +98,13 @@ test('celular em paisagem usa o filme vertical e só baixa a variante selecionad
   try {
     const page = await context.newPage();
     const requests: string[] = [];
-    page.on('request', request => { if (/gate-.*-v3\.mp4/.test(request.url())) requests.push(request.url()); });
+    page.on('request', request => { if (/gate-.*-v4\.mp4/.test(request.url())) requests.push(request.url()); });
     await page.goto('./', { waitUntil: 'domcontentloaded' });
   await openGate(page);
     await expect(page.locator('.intro-gate')).toHaveAttribute('data-phase', 'playing');
-    await expect(page.locator('.intro-gate-video')).toHaveAttribute('src', /gate-mobile-v3\.mp4$/);
+    await expect(page.locator('.intro-gate-video')).toHaveAttribute('src', /gate-mobile-v4\.mp4$/);
     expect(requests.length).toBeGreaterThan(0);
-    expect(requests.every(url => url.endsWith('gate-mobile-v3.mp4'))).toBe(true);
+    expect(requests.every(url => url.endsWith('gate-mobile-v4.mp4'))).toBe(true);
     await page.getByRole('button', { name: 'Pular introdução', exact: true }).click();
     await expectSiteAvailable(page);
   } finally { await context.close(); }
@@ -279,6 +279,10 @@ for (const viewport of [
     expect(arrowBounds!.y).toBeGreaterThanOrEqual(0);
     expect(arrowBounds!.x + arrowBounds!.width).toBeLessThanOrEqual(viewport.width);
     expect(arrowBounds!.y + arrowBounds!.height).toBeLessThanOrEqual(viewport.height);
+    if (viewport.width < 768) {
+      expect(arrowBounds!.x).toBeCloseTo(0, 0);
+      expect(arrowBounds!.y + arrowBounds!.height / 2).toBeCloseTo(viewport.height / 2, 0);
+    }
     await page.screenshot({ path: testInfo.outputPath('handle-ready.png') });
     await openGate(page);
     const overlay = page.locator('.intro-gate');
@@ -300,7 +304,7 @@ for (const viewport of [
     expect(skipBounds!.x + skipBounds!.width).toBeLessThanOrEqual(viewport.width);
     expect(skipBounds!.y + skipBounds!.height).toBeLessThanOrEqual(viewport.height);
     await expect(page.getByRole('button', { name: /Ativar som|Silenciar/ })).toHaveCount(0);
-    await expect(video).toHaveAttribute('src', viewport.width < 768 ? /gate-mobile-v3\.mp4$/ : /gate-desktop-v3\.mp4$/);
+    await expect(video).toHaveAttribute('src', viewport.width < 768 ? /gate-mobile-v4\.mp4$/ : /gate-desktop-v4\.mp4$/);
     await expect.poll(() => video.evaluate((element) => (element as HTMLVideoElement).currentTime)).toBeGreaterThan(0.35);
     await page.screenshot({ path: testInfo.outputPath(`intro-${viewport.width}x${viewport.height}.png`) });
     await expectSiteAvailable(page, 6500);

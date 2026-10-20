@@ -20,18 +20,18 @@ export const introConfig: {
   maxWaitMs: number;
 } = {
   frequency: 'session',
-  storageKey: 'ferro-forma:intro:v4',
+  storageKey: 'ferro-forma:intro:v5',
   mobileQuery: '(max-width: 767px), (pointer: coarse) and (max-height: 600px)',
   media: {
     desktop: {
-      videoPath: 'media/gate-desktop-v3.mp4',
-      posterPath: 'media/gate-desktop-v3.webp',
+      videoPath: 'media/gate-desktop-v4.mp4',
+      posterPath: 'media/gate-desktop-v4.webp',
       width: 1920, height: 1080, animationSeconds: 1.6,
       handle: { x: 286, y: 620 },
     },
     mobile: {
-      videoPath: 'media/gate-mobile-v3.mp4',
-      posterPath: 'media/gate-mobile-v3.webp',
+      videoPath: 'media/gate-mobile-v4.mp4',
+      posterPath: 'media/gate-mobile-v4.webp',
       width: 1080, height: 1920, animationSeconds: 1.8,
       handle: { x: 694, y: 1070 },
     },

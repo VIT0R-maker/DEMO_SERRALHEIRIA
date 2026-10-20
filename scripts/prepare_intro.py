@@ -11,7 +11,7 @@ import subprocess
 from fractions import Fraction
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageStat
+from PIL import Image, ImageChops, ImageDraw, ImageStat
 
 
 def run(command: list[str]) -> bytes:
@@ -31,8 +31,9 @@ def prepare(source: Path, variant: str, seconds: float, ffmpeg: str, ffprobe: st
     fps = 30
     source_fps = float(Fraction(original_video["avg_frame_rate"]))
     samples = round(int(original_audio["duration_ts"]) * Fraction(original_audio["time_base"]) * int(original_audio["sample_rate"]))
-    # Remove the long white tail from the visual track only. The opening itself
-    # should fill the requested duration; all of the original audio remains.
+    # Remove the static lead-in and white tail from the image only. Keep the
+    # last closed frame immediately before sustained movement, so releasing a
+    # swipe produces visible motion without changing any of the audio timing.
     thumbnails = run([ffmpeg, "-v", "error", "-i", str(source), "-map", "0:v:0",
                       "-vf", "scale=160:90", "-fps_mode", "passthrough",
                       "-f", "rawvideo", "-pix_fmt", "gray", "pipe:1"])
@@ -40,14 +41,22 @@ def prepare(source: Path, variant: str, seconds: float, ffmpeg: str, ffprobe: st
                      for i in range(0, len(thumbnails), 14400)]
     first_white = next(i for i, frame in enumerate(source_frames)
                        if frame.getextrema()[0] >= 235 and ImageStat.Stat(frame).mean[0] > 240)
+    differences = [ImageStat.Stat(ImageChops.difference(source_frames[0], frame)).mean[0]
+                   for frame in source_frames]
+    first_motion = next(i for i in range(1, first_white - 2)
+                        if all(value > 3 for value in differences[i:i + 3]))
+    first_visual_frame = first_motion - 1
     last_visual_frame = min(first_white + 1, len(source_frames) - 1)
-    last_source_pts = last_visual_frame / source_fps
+    opening_seconds = (last_visual_frame - first_visual_frame) / source_fps
     # Include the very last white source frame at the last target frame.
-    speed_factor = (seconds - 1 / fps) / last_source_pts
+    speed_factor = (seconds - 1 / fps) / opening_seconds
     output = root / "public" / "media"
     output.mkdir(parents=True, exist_ok=True)
-    target = output / f"gate-{variant}-v3.mp4"
-    video_filter = (f"trim=end_frame={last_visual_frame + 1},setpts=(PTS-STARTPTS)*{speed_factor:.15f},fps={fps},"
+    target = output / f"gate-{variant}-v4.mp4"
+    if source.resolve() == target.resolve():
+        raise ValueError("Use the original film or previous prepared version, not the output file.")
+    video_filter = (f"trim=start_frame={first_visual_frame}:end_frame={last_visual_frame + 1},"
+                    f"setpts=(PTS-STARTPTS)*{speed_factor:.15f},fps={fps},"
                     f"tpad=stop_mode=clone:stop_duration={1 / fps:.15f},"
                     f"trim=duration={seconds},setpts=PTS-STARTPTS")
     run([ffmpeg, "-y", "-v", "error", "-i", str(source), "-map", "0:v:0", "-map", "0:a:0",
@@ -70,7 +79,7 @@ def prepare(source: Path, variant: str, seconds: float, ffmpeg: str, ffprobe: st
     first_frame = run([ffmpeg, "-v", "error", "-i", str(target), "-map", "0:v:0",
                        "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"])
     Image.frombytes("RGB", (video["width"], video["height"]), first_frame).save(
-        output / f"gate-{variant}-v3.webp", "WEBP", quality=90, method=6)
+        output / f"gate-{variant}-v4.webp", "WEBP", quality=90, method=6)
     width, height = (480, 270) if variant == "desktop" else (270, 480)
     raw = run([ffmpeg, "-v", "error", "-i", str(target), "-map", "0:v:0",
                "-vf", f"scale={width}:{height}", "-fps_mode", "passthrough",
@@ -78,6 +87,9 @@ def prepare(source: Path, variant: str, seconds: float, ffmpeg: str, ffprobe: st
     frame_size = width * height * 3
     frames = [Image.frombytes("RGB", (width, height), raw[i:i + frame_size])
               for i in range(0, len(raw), frame_size)]
+    first_output_motion = next(i for i, frame in enumerate(frames)
+                               if sum(ImageStat.Stat(ImageChops.difference(frames[0], frame)).mean) / 3 > 3)
+    assert first_output_motion / fps <= 0.15, "The prepared film still has a static lead-in"
     selected = [round(i * (len(frames) - 1) / 5) for i in range(6)]
     sheet = Image.new("RGB", (width * 3, (height + 30) * 2), "#e7e7e7")
     draw = ImageDraw.Draw(sheet)
@@ -89,7 +101,9 @@ def prepare(source: Path, variant: str, seconds: float, ffmpeg: str, ffprobe: st
     qa.mkdir(exist_ok=True)
     sheet.save(qa / f"intro-{variant}-frames.jpg", quality=92)
     last_mean = ImageStat.Stat(frames[-1]).mean
-    report = {"variant": variant, "source_opening_seconds": last_source_pts,
+    report = {"variant": variant, "source_opening_seconds": opening_seconds,
+              "removed_static_seconds": first_visual_frame / source_fps,
+              "first_visible_motion_seconds": first_output_motion / fps,
               "visual_seconds": float(video["duration"]),
               "frames": int(video["nb_frames"]), "audio_seconds": float(audio["duration"]),
               "total_seconds": float(prepared["format"]["duration"]), "bytes": target.stat().st_size,

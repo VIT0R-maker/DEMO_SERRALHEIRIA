@@ -58,16 +58,16 @@ As interações incluem menu compacto, navegação por âncoras, serviço preenc
 
 ## Introdução cinematográfica
 
-A abertura começa com o portão fechado e uma seta animada sobre a maçaneta. Arraste para a direita, com mouse ou toque, para iniciar o filme com áudio. Não há quadro de boas-vindas, botão “Abrir o portão” nem controle “Ativar som”. A seta é um controle acessível sem aparência de botão: Enter, Espaço ou Seta para a direita também iniciam a abertura quando ela está focada. Pular e Escape continuam disponíveis.
+A abertura começa com o portão fechado e uma seta animada para a direita. Arraste nessa direção, com mouse ou toque, para iniciar o filme com áudio. Não há quadro de boas-vindas, botão “Abrir o portão” nem controle “Ativar som”. A seta é um controle acessível sem aparência de botão: Enter, Espaço ou Seta para a direita também iniciam a abertura quando ela está focada. Pular e Escape continuam disponíveis.
 
-A posição da seta é calculada usando as coordenadas da maçaneta no vídeo original e o recorte real de `object-fit: cover`. O recorte é ajustado quando necessário para manter a maçaneta visível. Arrastos curtos, verticais, para a esquerda e gestos cancelados não iniciam a reprodução. A distância mínima varia de 40 a 72 px conforme a tela.
+No desktop, a posição da seta acompanha a maçaneta no recorte real de `object-fit: cover`. No celular, ela fica no meio da altura da tela, junto à borda esquerda: o traço chega a 8 px da borda, respeitando a área segura do aparelho. Arrastos curtos, verticais, para a esquerda e gestos cancelados não iniciam a reprodução. A distância mínima varia de 40 a 72 px conforme a tela. A chamada de reprodução acontece diretamente ao soltar o arrasto, sem temporizador.
 
 | Variante | Arquivo fornecido | Imagem | Áudio original completo |
 | --- | --- | --- | --- |
 | Desktop | COMPUTADOR.mp4 | 1920 × 1080, 48 quadros, **1,600 s** | **4,179002 s** |
 | Celular | CELULAR.mp4 | 1080 × 1920, 54 quadros, **1,800 s** | **4,040 s** |
 
-Os arquivos publicados em `public/media/gate-desktop-v3.mp4` e `gate-mobile-v3.mp4` usam H.264 com faststart e AAC estéreo a 192 kbps. Apenas a imagem foi acelerada, removendo sua espera branca final excessiva. O áudio mantém velocidade, tom e duração da fonte, com limite preciso em amostras para não acrescentar padding AAC. O script verifica os tempos das duas faixas. Os posters WebP são os primeiros quadros de cada versão.
+Os arquivos publicados em `public/media/gate-desktop-v4.mp4` e `gate-mobile-v4.mp4` usam H.264 com faststart e AAC estéreo a 192 kbps. A imagem foi retemporizada para eliminar a espera inicial com o portão parado e a espera branca final excessiva. A revisão v4 removeu 0,367 s de espera inicial do desktop e 0,567 s do celular da versão v3; a abertura continua durando 1,6 s e 1,8 s. O vídeo é pré-carregado enquanto aguarda o gesto. O áudio mantém velocidade, tom e duração da fonte, com limite preciso em amostras para não acrescentar padding AAC. O script verifica os tempos das duas faixas. Os posters WebP são os primeiros quadros de cada versão.
 
 O relógio real da mídia inicia o fade branco de **650 ms** ao atingir 1,6 s ou 1,8 s. O mesmo elemento continua tocando o áudio até `ended`, mesmo com o site já visível e interativo. O gesto do visitante é usado diretamente para autorizar áudio no navegador; não há tentativa de contornar suas políticas nem reprodução silenciosa alternativa. Pular, Escape, falha de mídia ou mudança para movimento reduzido interrompem o som.
 
@@ -76,12 +76,13 @@ O relógio real da mídia inicia o fade branco de **650 ms** ao atingir 1,6 s ou
 | Fade normal e ao pular | `src/introConfig.ts`: `fadeMs` e `skipFadeMs`. |
 | Frequência e chave de sessão | `frequency` e `storageKey`. |
 | Vídeos, posters e tempos visuais | `media.desktop` e `media.mobile`. Os tempos devem corresponder aos arquivos preparados pelo script. |
-| Posição da maçaneta | `media.desktop.handle` e `media.mobile.handle`, em pixels do vídeo original. |
+| Posição da maçaneta e recorte | `media.desktop.handle` e `media.mobile.handle`, em pixels do vídeo original. |
+| Seta na borda esquerda do celular | `IntroGate.css`: `.intro-gate[data-variant='mobile'] .intro-gate-handle`. |
 | Seleção de celular | `mobileQuery`: até 767 px de largura ou tela de toque em paisagem com até 600 px de altura. |
 | Animação da seta | `src/components/IntroGate.css`: `gate-pull-hint`. |
 | Recuperação de falhas | `loadingTimeoutMs`, `stalledTimeoutMs` e `maxWaitMs`. |
 
-A variante é escolhida uma vez por abertura. Girar ou redimensionar a tela recalcula o recorte e a posição da seta, sem trocar ou reiniciar o filme. A introdução aparece uma vez por sessão da aba. Para revê-la, abra uma aba independente ou remova a chave `ferro-forma:intro:v4` do `sessionStorage`. Links com âncora e movimento reduzido apresentam diretamente o conteúdo.
+A variante é escolhida uma vez por abertura. Girar ou redimensionar a tela recalcula o recorte e a posição da seta, sem trocar ou reiniciar o filme. A introdução aparece uma vez por sessão da aba. Para revê-la, abra uma aba independente ou remova a chave `ferro-forma:intro:v5` do `sessionStorage`. Links com âncora e movimento reduzido apresentam diretamente o conteúdo.
 
 Durante a abertura, `inert` bloqueia a interação com a página e a rolagem é travada com compensação da barra lateral. O fade libera esses controles. Erro de mídia, carregamento superior a 4,5 s ou reprodução parada por 2,5 s liberam o site; existe limite total de 12 s após a tentativa de reprodução. A espera pelo gesto não é contada como falha.
 
